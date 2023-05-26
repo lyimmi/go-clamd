@@ -1,30 +1,24 @@
 package clamd
 
-type Option func(*ClamAV)
+type Option func(*Clamd)
 
-func WithTCP() Option {
-	return func(c *ClamAV) {
-		c.connType = socketTypeTCP
+func WithDefaultTCP() Option {
+	return func(c *Clamd) {
+		c.connType = SOCKET_TYPE_TCP
 	}
 }
 
-func WithCustomTCP(host string, port int) Option {
-	return func(c *ClamAV) {
-		c.connType = socketTypeTCP
+func WithTCP(host string, port int) Option {
+	return func(c *Clamd) {
+		c.connType = SOCKET_TYPE_TCP
 		c.TCPHost = host
 		c.TCPPort = port
 	}
 }
 
-func WithUnix() Option {
-	return func(c *ClamAV) {
-		c.connType = socketTypeUnix
-	}
-}
-
-func WithCustomUnix(name string) Option {
-	return func(c *ClamAV) {
-		c.connType = socketTypeUnix
+func WithUnix(name string) Option {
+	return func(c *Clamd) {
+		c.connType = SOCKET_TYPE_UNIX
 		c.unixSocketName = name
 	}
 }

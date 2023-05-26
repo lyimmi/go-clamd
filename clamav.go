@@ -8,46 +8,46 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	socketTypeTCP  string = "tcp"
-	socketTypeUnix string = "unix"
+	DATA_CHUNK_SIZE       = 1024
+	SOCKET_TYPE_TCP       = "tcp"
+	SOCKET_TYPE_UNIX      = "unix"
+	CMD_PING              = "PING"
+	CMD_VERSION           = "VERSION"
+	CMD_RELOAD            = "RELOAD"
+	CMD_SHUTDOWN          = "SHUTDOWN"
+	CMD_INSTREAM          = "INSTREAM"
+	CMD_SCAN              = "SCAN"
+	CMD_CONTSCAN          = "CONTSCAN"
+	RES_OK                = "OK"
+	RES_PONG              = "PONG"
+	RES_SHUTDOWN          = "SHUTDOWN"
+	RES_RELOADING         = "RELOADING"
+	RES_NO_SUCH_FILE      = "No such file or directory. ERROR"
+	RES_PERMISSION_DENIED = "Permission denied. ERROR"
 )
 
-var (
-	cmdPING    = []byte("PING")
-	cmdVERSION = []byte("VERSION")
-	cmdRELOAD  = []byte("RELOAD")
-	//cmdSHOUTDOWN = []byte("SHUTDOWN")
-	cmdSTREAM    = []byte("zINSTREAM\\0")
-	cmdSCAN      = []byte("SCAN ")
-	cmdCONTSCAN  = []byte("CONTSCAN ")
-	resOK        = []byte("OK\n")
-	resPONG      = []byte("PONG\n")
-	resRELOADING = []byte("RELOADING\n")
-)
-
-var (
-	ErrFilePathIsEmpty = errors.New("file path is empty")
-)
-
-func NewClamAV(opts ...Option) *ClamAV {
+func NewClamd(opts ...Option) *Clamd {
 	const (
-		defaultSocketType     = socketTypeUnix
+		defaultSocketType     = SOCKET_TYPE_UNIX
 		defaultUnixSocketName = "/var/run/clamav/clamd.ctl"
 		defaultTCPHost        = "127.0.0.1"
 		defaultTCPPort        = 3310
-		defaultTimeout        = 30 * time.Second
+		defaultTimeout        = 180 * time.Second
 	)
 
-	c := &ClamAV{
+	c := &Clamd{
+		mu:             sync.Mutex{},
 		connType:       defaultSocketType,
 		unixSocketName: defaultUnixSocketName,
 		TCPHost:        defaultTCPHost,
 		TCPPort:        defaultTCPPort,
 		timeout:        defaultTimeout,
+		conn:           nil,
 	}
 
 	for _, opt := range opts {
@@ -55,19 +55,21 @@ func NewClamAV(opts ...Option) *ClamAV {
 	}
 
 	switch c.connType {
-	case socketTypeTCP:
+	case SOCKET_TYPE_TCP:
 		c.connStr = fmt.Sprintf("%s:%d", c.TCPHost, c.TCPPort)
-	case socketTypeUnix:
+	case SOCKET_TYPE_UNIX:
 		c.connStr = defaultUnixSocketName
 	}
 
 	c.dialer = net.Dialer{
 		Timeout: c.timeout,
 	}
+
 	return c
 }
 
-type ClamAV struct {
+type Clamd struct {
+	mu             sync.Mutex
 	connType       string
 	connStr        string
 	unixSocketName string
@@ -75,117 +77,232 @@ type ClamAV struct {
 	TCPPort        int
 	timeout        time.Duration
 	dialer         net.Dialer
+	conn           net.Conn
 }
 
-func (c ClamAV) call(ctx context.Context, command []byte) ([]byte, error) {
-	conn, err := c.dialer.DialContext(ctx, c.connType, c.connStr)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
+func (c *Clamd) l() {
+	c.mu.Lock()
+}
 
-	_, err = conn.Write(command)
+func (c *Clamd) ul() {
+	if c.conn != nil {
+		c.conn.Close()
+	}
+	c.mu.Unlock()
+}
+
+func (c *Clamd) writeCmd(ctx context.Context, command string) error {
+	var err error
+	c.conn, err = c.dialer.DialContext(ctx, c.connType, c.connStr)
 	if err != nil {
-		return nil, err
+		return errors.Join(ErrDial, err)
 	}
 
+	_, err = c.conn.Write([]byte(fmt.Sprintf("n%s\n", command)))
+	if err != nil {
+		return errors.Join(ErrCommandCall, err)
+	}
+
+	return err
+}
+
+func (c *Clamd) readData() (string, error) {
 	var buf bytes.Buffer
-	_, err = io.Copy(&buf, conn)
+	_, err := io.Copy(&buf, c.conn)
 	if err != nil {
-		return nil, err
+		return "", errors.Join(ErrCommandRead, err)
 	}
 
-	return buf.Bytes(), err
+	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
-// Ping checks if ClamAV is up and responsive.
-func (c ClamAV) Ping(ctx context.Context) (bool, error) {
-	res, err := c.call(ctx, cmdPING)
+func (c *Clamd) writeCmdReadData(ctx context.Context, command string) (res string, err error) {
+	err = c.writeCmd(ctx, command)
+	if err != nil {
+		return "", errors.Join(ErrCommandCall, err)
+	}
+
+	res, err = c.readData()
+	if err != nil {
+		return "", errors.Join(ErrCommandCall, err)
+	}
+
+	return res, err
+}
+func (c *Clamd) sendData(data []byte) error {
+	var buf [4]byte
+	lenData := len(data)
+	buf[0] = byte(lenData >> 24)
+	buf[1] = byte(lenData >> 16)
+	buf[2] = byte(lenData >> 8)
+	buf[3] = byte(lenData >> 0)
+
+	a := buf
+
+	b := make([]byte, len(a))
+	for i := range a {
+		b[i] = a[i]
+	}
+
+	_, err := c.conn.Write(b)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.conn.Write(data)
+	return err
+}
+
+// Ping checks if Clamd is up and responsive.
+func (c *Clamd) Ping(ctx context.Context) (bool, error) {
+	c.l()
+	defer c.ul()
+
+	res, err := c.writeCmdReadData(ctx, CMD_PING)
 	if err != nil {
 		return false, err
 	}
 
-	return bytes.Equal(res, resPONG), nil
+	if res != RES_PONG {
+		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
+	}
+
+	return true, nil
 }
 
-// Version returns ClamAV's version.
-func (c ClamAV) Version(ctx context.Context) (string, error) {
-	res, err := c.call(ctx, cmdVERSION)
+// Version returns Clamd's version.
+func (c *Clamd) Version(ctx context.Context) (string, error) {
+	c.l()
+	defer c.ul()
+
+	res, err := c.writeCmdReadData(ctx, CMD_VERSION)
 	if err != nil {
 		return "", err
 	}
-	return string(bytes.Trim(res, "\n")), nil
+
+	return res, nil
 }
 
-// Reload ClamAV virus databases.
-func (c ClamAV) Reload(ctx context.Context) (bool, error) {
-	res, err := c.call(ctx, cmdRELOAD)
+// Reload Clamd virus databases.
+func (c *Clamd) Reload(ctx context.Context) (bool, error) {
+	c.l()
+	defer c.ul()
+
+	res, err := c.writeCmdReadData(ctx, CMD_RELOAD)
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(res, resRELOADING), nil
+
+	if res != RES_RELOADING {
+		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
+	}
+
+	return true, nil
 }
 
-//	func (c ClamAV) ShoutDown(ctx context.Context) (string, error) {
-//		return "", nil
-//	}
+func (c *Clamd) Shutdown(ctx context.Context) (bool, error) {
+	c.l()
+	defer c.ul()
+
+	_, err := c.writeCmdReadData(ctx, CMD_SHUTDOWN)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
 
 // Scan a file or a directory (recursively) with archive support enabled (if not disabled in clamd.conf). A full path is required.
-func (c ClamAV) Scan(ctx context.Context, src string) (bool, error) {
+func (c *Clamd) Scan(ctx context.Context, src string) (bool, error) {
+	c.l()
+	defer c.ul()
+
 	if src == "" {
-		return false, ErrFilePathIsEmpty
+		return false, ErrEmptySrc
 	}
-	var (
-		err error
-		res []byte
-	)
-	cmd := strings.Builder{}
-	_, err = cmd.Write(cmdSCAN)
-	if err != nil {
-		return false, err
-	}
-	_, err = cmd.WriteString(src)
-	if err != nil {
-		return false, err
-	}
-	res, err = c.call(ctx, []byte(cmd.String()))
+
+	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", CMD_SCAN, src))
 	if err != nil {
 		return false, err
 	}
 
-	return bytes.HasSuffix(res, resOK), nil
+	if strings.HasSuffix(res, RES_OK) {
+		return true, nil
+	}
+
+	if strings.HasSuffix(res, RES_NO_SUCH_FILE) {
+		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
+	}
+	if strings.HasSuffix(res, RES_PERMISSION_DENIED) {
+		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
+	}
+
+	return false, errors.Join(ErrUnknown, fmt.Errorf("%s", res))
 }
 
 // ScanStream todo: implement reader and stream
-func (c ClamAV) ScanStream(ctx context.Context) (bool, error) {
+func (c *Clamd) ScanStream(ctx context.Context, r io.Reader) (bool, error) {
+	c.l()
+	defer c.ul()
 
+	err := c.writeCmd(ctx, CMD_INSTREAM)
+	if err != nil {
+		return false, err
+	}
+
+	for {
+		buf := make([]byte, DATA_CHUNK_SIZE)
+		n, err := r.Read(buf)
+		if n > 0 {
+			err = c.sendData(buf[0:n])
+			if err != nil {
+				return false, err
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	_, err = c.conn.Write([]byte{0, 0, 0, 0})
+	if err != nil {
+		return false, err
+	}
+
+	res, err := c.readData()
+	if strings.HasSuffix(res, RES_OK) {
+		return true, nil
+	}
 	return false, nil
 }
 
 // ScanAll Scan file or directory (recursively) with archive support enabled and don't stop the scanning when a virus is found.
-func (c ClamAV) ScanAll(ctx context.Context, src string) (bool, error) {
+func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
+	c.l()
+	defer c.ul()
+
 	if src == "" {
-		return false, ErrFilePathIsEmpty
+		return false, ErrEmptySrc
 	}
 
-	var (
-		err error
-		res []byte
-	)
-
-	cmd := strings.Builder{}
-	_, err = cmd.Write(cmdCONTSCAN)
-	if err != nil {
-		return false, err
-	}
-	_, err = cmd.WriteString(src)
-	if err != nil {
-		return false, err
-	}
-	res, err = c.call(ctx, []byte(cmd.String()))
+	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", CMD_CONTSCAN, src))
 	if err != nil {
 		return false, err
 	}
 
-	return bytes.HasSuffix(res, resOK), nil
+	if !strings.HasSuffix(res, RES_OK) {
+		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
+	}
+
+	return true, nil
 }
+
+var (
+	ErrDial             = errors.New("error while connecting to clamd")
+	ErrCommandCall      = errors.New("error while calling clamd")
+	ErrCommandRead      = errors.New("error while reading response from clamd")
+	ErrEmptySrc         = errors.New("scan source is empty")
+	ErrInvalidResponse  = errors.New("invalid response from clamd")
+	ErrNoSuchFileOrDir  = errors.New("clamd can't find file or directory")
+	ErrPermissionDenied = errors.New("clamd can't open file or dir, permission denied")
+	ErrUnknown          = errors.New("unknown error")
+)
