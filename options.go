@@ -1,4 +1,4 @@
-package clamav
+package clamd
 
 type Option func(*ClamAV)
 

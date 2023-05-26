@@ -1,3 +1,3 @@
-module go-clamav
+module go-clamd
 
 go 1.20

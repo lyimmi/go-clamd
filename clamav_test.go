@@ -1,4 +1,4 @@
-package clamav
+package clamd
 
 import (
 	"context"
