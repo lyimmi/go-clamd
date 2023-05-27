@@ -26,7 +26,7 @@ jobs:
       run: sudo sed -i 's/^\(User\s*\).*$/\1root/' /etc/clamav/clamd.conf
             
     - name: ClamAV freshclam and restart
-      run: sudo freshclam && sudo systemctl restart clamav-daemon.service
+      run: sudo systemctl stop clamav-freshclam.service && sudo freshclam && sudo systemctl restart clamav-daemon.service
       
     - name: Set up Go
       uses: actions/setup-go@v3
