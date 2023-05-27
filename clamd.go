@@ -36,6 +36,7 @@ const (
 	resReloading        = "RELOADING"
 	resNoSuchFile       = "No such file or directory. ERROR"
 	resPermissionDenied = "Permission denied. ERROR"
+	resEICAR            = "Win.Test.EICAR_HDB-1 FOUND"
 )
 
 // NewClamd returns a Clamd client with default options.
@@ -245,7 +246,9 @@ func (c *Clamd) Scan(ctx context.Context, src string) (bool, error) {
 	if strings.HasSuffix(res, resOk) {
 		return true, nil
 	}
-
+	if strings.HasSuffix(res, resEICAR) {
+		return false, nil
+	}
 	if strings.HasSuffix(res, resNoSuchFile) {
 		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
 	}
@@ -292,6 +295,10 @@ func (c *Clamd) ScanStream(ctx context.Context, r io.Reader) (bool, error) {
 	if strings.HasSuffix(res, resOk) {
 		return true, nil
 	}
+	if strings.HasSuffix(res, resEICAR) {
+		return false, nil
+	}
+
 	return false, nil
 }
 
@@ -309,8 +316,17 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 		return false, err
 	}
 
-	if !strings.HasSuffix(res, resOk) {
-		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
+	if strings.HasSuffix(res, resOk) {
+		return true, nil
+	}
+	if strings.HasSuffix(res, resEICAR) {
+		return false, nil
+	}
+	if strings.HasSuffix(res, resNoSuchFile) {
+		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
+	}
+	if strings.HasSuffix(res, resPermissionDenied) {
+		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
 	}
 
 	return true, nil

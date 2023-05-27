@@ -6,15 +6,24 @@ import (
 	"testing"
 )
 
-func setupTest(t testing.TB) (clamd *Clamd, tearDown func(tb testing.TB)) {
-	clamd = NewClamd()
-	tearDown = func(t testing.TB) {}
-	return
+var eicar = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)
+
+func writeTestFile(t testing.TB) string {
+	f, err := os.CreateTemp("", "go-clamd-test-stream")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	_, err = f.Write(eicar)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	return f.Name()
 }
 
 func TestPing(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
+
 	got, err := clamd.Ping(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -25,8 +34,8 @@ func TestPing(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
+
 	got, err := clamd.Version(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -37,8 +46,8 @@ func TestVersion(t *testing.T) {
 }
 
 func TestReload(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
+
 	got, err := clamd.Reload(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -49,64 +58,52 @@ func TestReload(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
 
-	f, err := os.CreateTemp("", "go-clamd-test")
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Remove(f.Name())
-	_, err = f.WriteString("this is a test file for go-clamd")
+	tf := writeTestFile(t)
+	defer os.Remove(tf)
+
+	got, err := clamd.Scan(context.Background(), tf)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-
-	got, err := clamd.Scan(context.Background(), f.Name())
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	if !got {
-		t.Errorf("clamd.Scan() = %v; want true", got)
+	if got {
+		t.Errorf("clamd.Scan() = %v; want false", got)
 	}
 }
 
 func TestStream(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
 
-	f, err := os.CreateTemp("", "go-clamd-test-stream")
+	tf := writeTestFile(t)
+	defer os.Remove(tf)
+
+	f, err := os.Open(tf)
 	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Remove(f.Name())
-
-	for i := 0; i < 10; i++ {
-		_, err = f.WriteString("this is a test file for go-clamd\n")
-		if err != nil {
-			t.Errorf("%v", err)
-		}
+		t.Fatal(err)
 	}
 
 	got, err := clamd.ScanStream(context.Background(), f)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	if !got {
-		t.Errorf("clamd.Scan() = %v; want true", got)
+	if got {
+		t.Errorf("clamd.Scan() = %v; want false", got)
 	}
 }
 
 func TestScanAll(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
+
+	tf := writeTestFile(t)
+	defer os.Remove(tf)
 
 	got, err := clamd.ScanAll(context.Background(), "/tmp")
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	if !got {
-		t.Errorf("clamd.ScanAll() = %v; want true", got)
+	if got {
+		t.Errorf("clamd.Scan() = %v; want false", got)
 	}
 }
 
@@ -123,8 +120,7 @@ func TestScanAll(t *testing.T) {
 //}
 
 func TestStats(t *testing.T) {
-	clamd, teardown := setupTest(t)
-	defer teardown(t)
+	clamd := NewClamd()
 
 	got, err := clamd.Stats(context.Background())
 	if err != nil {
