@@ -26,10 +26,10 @@ jobs:
       run: sudo sed -i 's/^\(User\s*\).*$/\1root/' /etc/clamav/clamd.conf
       
     - name: ClamAV restart
-      run: sudo systemctl restart clamav-daemon.service
+      run: sudo systemctl start clamav-daemon.service
       
     - name: Check ClamAV is-active
-      run: systemctl is-active clamav-daemon.service
+      run: systemctl status clamav-daemon.service
       
     - name: Set up Go
       uses: actions/setup-go@v3
