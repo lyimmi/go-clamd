@@ -2,14 +2,25 @@ package clamd
 
 import (
 	"context"
+	"log"
 	"os"
+	"path"
 	"testing"
 )
 
 var eicar = []byte(`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`)
+var userHome = ""
+
+func init() {
+	var err error
+	userHome, err = os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+}
 
 func writeTestFile(t testing.TB) string {
-	f, err := os.CreateTemp("", "go-clamd-test-stream")
+	f, err := os.Create(path.Join(userHome, "go-clamd-test-file"))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -98,7 +109,7 @@ func TestScanAll(t *testing.T) {
 	tf := writeTestFile(t)
 	defer os.Remove(tf)
 
-	got, err := clamd.ScanAll(context.Background(), "/tmp")
+	got, err := clamd.ScanAll(context.Background(), tf)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
