@@ -24,24 +24,30 @@ func main() {
 
 	fileName := createTestFile()
 	defer os.Remove(fileName)
-	ok, _ = c.Scan(ctx, fileName)
-	if ok {
-		fmt.Printf("%s has no maleware\n", fileName)
-	}
 
-	ok, _ = c.ScanAll(ctx, "/tmp")
-	if ok {
-		fmt.Println("/tmp has no maleware")
-	}
-
-	stats, _ := c.Stats(ctx)
-	if ok {
-		d, err := json.MarshalIndent(stats, "", "  ")
+	if ok, err := c.Scan(ctx, fileName); !ok {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(string(d))
+		fmt.Printf("%s has maleware\n", fileName)
 	}
+
+	if ok, err := c.ScanAll(ctx, "/tmp"); !ok {
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("%s has maleware\n", fileName)
+	}
+
+	stats, err := c.Stats(ctx)
+	if err != nil {
+		panic(err)
+	}
+	d, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(d))
 }
 
 func createTestFile() string {

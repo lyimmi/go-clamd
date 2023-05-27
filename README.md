@@ -19,7 +19,33 @@ A Go client for ClamAV daemon over TCP or UNIX socket.
 |   Stats    | STATS | Replies with statistics about the scan queue, contents of scan queue, and memory usage. The exact reply format is subject to change in future releases.                                                                                                                                                                                             |
 
 ## Usage
-TODO: create examples
+
+```golang
+import (
+    "fmt"
+    "github.com/Lyimmi/go-clamd"
+)
+
+c := clamd.NewClamd()
+
+if ok, _ := c.Ping(ctx); !ok {
+    fmt.Println("clamd nok")
+}
+
+if ok, err := c.Scan(ctx, fileName); !ok {
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("%s has maleware\n", fileName)
+}
+
+if ok, err := c.ScanAll(ctx, "/tmp"); !ok {
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("%s has maleware\n", fileName)
+}
+```
 
 ## License
 The MIT License (MIT)
