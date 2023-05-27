@@ -23,8 +23,17 @@ jobs:
       run: cat /etc/clamav/clamd.conf | grep Local
       shell: bash
 
+    - name: Stop Clamd
+      run: sudo systemctl stop clamav-daemon.service
+
+    - name: Remove log
+      run: sudo rm /var/log/clamav/freshclam.log
+
     - name: Start Clamd
-      run: sudo service clamav-daemon start
+      run: sudo systemctl start clamav-daemon.service
+
+    - name: Clamd status
+      run: sudo systemctl status clamav-daemon.service
       
     - name: Set up Go
       uses: actions/setup-go@v3
