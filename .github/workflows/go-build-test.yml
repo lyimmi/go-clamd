@@ -19,9 +19,12 @@ jobs:
     - name: Install linux dependencies
       run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
 
-    - name: Ping clamd.sock
+    - name: Check for socket settings
       run: cat /etc/clamav/clamd.conf | grep Local
       shell: bash
+
+    - name: Start Clamd
+      run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
       
     - name: Set up Go
       uses: actions/setup-go@v3
