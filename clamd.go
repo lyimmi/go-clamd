@@ -69,7 +69,7 @@ func NewClamd(opts ...Option) *Clamd {
 	case socketTypeTcp:
 		c.connStr = fmt.Sprintf("%s:%d", c.tcpHost, c.tcpPort)
 	case socketTypeUnix:
-		c.connStr = defaultUnixSocketName
+		c.connStr = c.unixSocketName
 	}
 
 	c.dialer = net.Dialer{

@@ -6,8 +6,15 @@ import (
 	"testing"
 )
 
+func setupTest(t testing.TB) (clamd *Clamd, tearDown func(tb testing.TB)) {
+	clamd = NewClamd()
+	tearDown = func(t testing.TB) {}
+	return
+}
+
 func TestPing(t *testing.T) {
-	clamd := NewClamd()
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
 	got, err := clamd.Ping(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -18,7 +25,8 @@ func TestPing(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	clamd := NewClamd()
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
 	got, err := clamd.Version(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -29,7 +37,8 @@ func TestVersion(t *testing.T) {
 }
 
 func TestReload(t *testing.T) {
-	clamd := NewClamd()
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
 	got, err := clamd.Reload(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -40,6 +49,9 @@ func TestReload(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
+
 	f, err := os.CreateTemp("", "go-clamd-test")
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -50,7 +62,6 @@ func TestScan(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 
-	clamd := NewClamd()
 	got, err := clamd.Scan(context.Background(), f.Name())
 	if err != nil {
 		t.Errorf("%v", err)
@@ -61,6 +72,9 @@ func TestScan(t *testing.T) {
 }
 
 func TestStream(t *testing.T) {
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
+
 	f, err := os.CreateTemp("", "go-clamd-test-stream")
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -74,7 +88,6 @@ func TestStream(t *testing.T) {
 		}
 	}
 
-	clamd := NewClamd()
 	got, err := clamd.ScanStream(context.Background(), f)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -85,7 +98,9 @@ func TestStream(t *testing.T) {
 }
 
 func TestScanAll(t *testing.T) {
-	clamd := NewClamd()
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
+
 	got, err := clamd.ScanAll(context.Background(), "/tmp")
 	if err != nil {
 		t.Errorf("%v", err)
@@ -96,7 +111,8 @@ func TestScanAll(t *testing.T) {
 }
 
 //func TestShutdown(t *testing.T) {
-//	clamd := NewClamd()
+//	clamd, teardown := setupTest(t)
+//	defer teardown(t)
 //	got, err := clamd.Shutdown(context.Background())
 //	if err != nil {
 //		t.Errorf("%v", err)
@@ -107,7 +123,9 @@ func TestScanAll(t *testing.T) {
 //}
 
 func TestStats(t *testing.T) {
-	clamd := NewClamd()
+	clamd, teardown := setupTest(t)
+	defer teardown(t)
+
 	got, err := clamd.Stats(context.Background())
 	if err != nil {
 		t.Errorf("%v", err)
