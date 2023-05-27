@@ -141,6 +141,10 @@ func (c *Clamd) writeCmdReadData(ctx context.Context, command string) (res strin
 
 	return res, err
 }
+
+// sendData sends a stream of data to clamd
+//
+// [dutchcoders/go-clamd]: https://github.com/dutchcoders/go-clamd
 func (c *Clamd) sendData(data []byte) error {
 	var buf [4]byte
 	lenData := len(data)
