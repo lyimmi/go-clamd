@@ -20,10 +20,7 @@ jobs:
       run: sudo apt-get update -y && sudo apt-get install -y clamav clamav-daemon
       
     - name: ClamAV setup
-      run: sudo sed -i 's/^\(LocalSocketGroup\s*\).*$/\1root/' /etc/clamav/clamd.conf
-      
-    - name: ClamAV set user
-      run: sudo sed -i 's/^\(User\s*\).*$/\1root/' /etc/clamav/clamd.conf
+      run: sudo sed -i 's/^\(LocalSocketGroup\s*\).*$/\1root/' /etc/clamav/clamd.conf && sudo sed -i 's/^\(User\s*\).*$/\1root/' /etc/clamav/clamd.conf
             
     - name: ClamAV freshclam and restart
       run: sudo systemctl stop clamav-freshclam.service && sudo freshclam && sudo systemctl restart clamav-daemon.service
