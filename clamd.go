@@ -1,3 +1,4 @@
+// Package clamd is a client for ClamAV daemon over TCP or UNIX socket.
 package clamd
 
 import (
@@ -12,40 +13,50 @@ import (
 	"time"
 )
 
+// dataChunkSize is the chunk size for stream scan.
+const dataChunkSize = 1024
+
+// Available socket types.
 const (
-	DATA_CHUNK_SIZE       = 1024
-	SOCKET_TYPE_TCP       = "tcp"
-	SOCKET_TYPE_UNIX      = "unix"
-	CMD_PING              = "PING"
-	CMD_VERSION           = "VERSION"
-	CMD_RELOAD            = "RELOAD"
-	CMD_SHUTDOWN          = "SHUTDOWN"
-	CMD_INSTREAM          = "INSTREAM"
-	CMD_SCAN              = "SCAN"
-	CMD_CONTSCAN          = "CONTSCAN"
-	RES_OK                = "OK"
-	RES_PONG              = "PONG"
-	RES_SHUTDOWN          = "SHUTDOWN"
-	RES_RELOADING         = "RELOADING"
-	RES_NO_SUCH_FILE      = "No such file or directory. ERROR"
-	RES_PERMISSION_DENIED = "Permission denied. ERROR"
+	socketTypeTcp  = "tcp"
+	socketTypeUnix = "unix"
 )
 
+// Commands and responses.
+const (
+	cmdPing             = "PING"
+	cmdVersion          = "VERSION"
+	cmdReload           = "RELOAD"
+	cmdShutdown         = "SHUTDOWN"
+	cmdInstream         = "INSTREAM"
+	cmdScan             = "SCAN"
+	cmdContscan         = "CONTSCAN"
+	resOk               = "OK"
+	resPong             = "PONG"
+	resReloading        = "RELOADING"
+	resNoSuchFile       = "No such file or directory. ERROR"
+	resPermissionDenied = "Permission denied. ERROR"
+)
+
+// NewClamd returns a Clamd client with default options.
+//
+// Default connection is a UNIX socket on /var/run/clamav/clamd.ctl with 30 second timeout. Defaults can be changed by
+// passing in Option functions.
 func NewClamd(opts ...Option) *Clamd {
 	const (
-		defaultSocketType     = SOCKET_TYPE_UNIX
+		defaultSocketType     = socketTypeUnix
 		defaultUnixSocketName = "/var/run/clamav/clamd.ctl"
 		defaultTCPHost        = "127.0.0.1"
 		defaultTCPPort        = 3310
-		defaultTimeout        = 180 * time.Second
+		defaultTimeout        = 60 * time.Second
 	)
 
 	c := &Clamd{
 		mu:             sync.Mutex{},
 		connType:       defaultSocketType,
 		unixSocketName: defaultUnixSocketName,
-		TCPHost:        defaultTCPHost,
-		TCPPort:        defaultTCPPort,
+		tcpHost:        defaultTCPHost,
+		tcpPort:        defaultTCPPort,
 		timeout:        defaultTimeout,
 		conn:           nil,
 	}
@@ -55,9 +66,9 @@ func NewClamd(opts ...Option) *Clamd {
 	}
 
 	switch c.connType {
-	case SOCKET_TYPE_TCP:
-		c.connStr = fmt.Sprintf("%s:%d", c.TCPHost, c.TCPPort)
-	case SOCKET_TYPE_UNIX:
+	case socketTypeTcp:
+		c.connStr = fmt.Sprintf("%s:%d", c.tcpHost, c.tcpPort)
+	case socketTypeUnix:
 		c.connStr = defaultUnixSocketName
 	}
 
@@ -68,13 +79,14 @@ func NewClamd(opts ...Option) *Clamd {
 	return c
 }
 
+// Clamd is a client for ClamAV's daemon clamd.
 type Clamd struct {
 	mu             sync.Mutex
 	connType       string
 	connStr        string
 	unixSocketName string
-	TCPHost        string
-	TCPPort        int
+	tcpHost        string
+	tcpPort        int
 	timeout        time.Duration
 	dialer         net.Dialer
 	conn           net.Conn
@@ -86,7 +98,7 @@ func (c *Clamd) l() {
 
 func (c *Clamd) ul() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
 	c.mu.Unlock()
 }
@@ -158,12 +170,12 @@ func (c *Clamd) Ping(ctx context.Context) (bool, error) {
 	c.l()
 	defer c.ul()
 
-	res, err := c.writeCmdReadData(ctx, CMD_PING)
+	res, err := c.writeCmdReadData(ctx, cmdPing)
 	if err != nil {
 		return false, err
 	}
 
-	if res != RES_PONG {
+	if res != resPong {
 		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
 	}
 
@@ -175,7 +187,7 @@ func (c *Clamd) Version(ctx context.Context) (string, error) {
 	c.l()
 	defer c.ul()
 
-	res, err := c.writeCmdReadData(ctx, CMD_VERSION)
+	res, err := c.writeCmdReadData(ctx, cmdVersion)
 	if err != nil {
 		return "", err
 	}
@@ -188,23 +200,24 @@ func (c *Clamd) Reload(ctx context.Context) (bool, error) {
 	c.l()
 	defer c.ul()
 
-	res, err := c.writeCmdReadData(ctx, CMD_RELOAD)
+	res, err := c.writeCmdReadData(ctx, cmdReload)
 	if err != nil {
 		return false, err
 	}
 
-	if res != RES_RELOADING {
+	if res != resReloading {
 		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
 	}
 
 	return true, nil
 }
 
+// Shutdown stops Clamd cleanly.
 func (c *Clamd) Shutdown(ctx context.Context) (bool, error) {
 	c.l()
 	defer c.ul()
 
-	_, err := c.writeCmdReadData(ctx, CMD_SHUTDOWN)
+	_, err := c.writeCmdReadData(ctx, cmdShutdown)
 	if err != nil {
 		return false, err
 	}
@@ -220,37 +233,40 @@ func (c *Clamd) Scan(ctx context.Context, src string) (bool, error) {
 		return false, ErrEmptySrc
 	}
 
-	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", CMD_SCAN, src))
+	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", cmdScan, src))
 	if err != nil {
 		return false, err
 	}
 
-	if strings.HasSuffix(res, RES_OK) {
+	if strings.HasSuffix(res, resOk) {
 		return true, nil
 	}
 
-	if strings.HasSuffix(res, RES_NO_SUCH_FILE) {
+	if strings.HasSuffix(res, resNoSuchFile) {
 		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
 	}
-	if strings.HasSuffix(res, RES_PERMISSION_DENIED) {
+	if strings.HasSuffix(res, resPermissionDenied) {
 		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
 	}
 
 	return false, errors.Join(ErrUnknown, fmt.Errorf("%s", res))
 }
 
-// ScanStream todo: implement reader and stream
+// ScanStream Scan a stream of data.This avoids the overhead of establishing new TCP connections and problems with NAT.
+//
+// Note: do not exceed StreamMaxLength as defined in clamd.conf, otherwise clamd will reply with INSTREAM size limit
+// exceeded and close the connection. (default is 25M)
 func (c *Clamd) ScanStream(ctx context.Context, r io.Reader) (bool, error) {
 	c.l()
 	defer c.ul()
 
-	err := c.writeCmd(ctx, CMD_INSTREAM)
+	err := c.writeCmd(ctx, cmdInstream)
 	if err != nil {
 		return false, err
 	}
 
 	for {
-		buf := make([]byte, DATA_CHUNK_SIZE)
+		buf := make([]byte, dataChunkSize)
 		n, err := r.Read(buf)
 		if n > 0 {
 			err = c.sendData(buf[0:n])
@@ -269,7 +285,7 @@ func (c *Clamd) ScanStream(ctx context.Context, r io.Reader) (bool, error) {
 	}
 
 	res, err := c.readData()
-	if strings.HasSuffix(res, RES_OK) {
+	if strings.HasSuffix(res, resOk) {
 		return true, nil
 	}
 	return false, nil
@@ -284,25 +300,14 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 		return false, ErrEmptySrc
 	}
 
-	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", CMD_CONTSCAN, src))
+	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", cmdContscan, src))
 	if err != nil {
 		return false, err
 	}
 
-	if !strings.HasSuffix(res, RES_OK) {
+	if !strings.HasSuffix(res, resOk) {
 		return false, errors.Join(ErrInvalidResponse, fmt.Errorf("%s", res))
 	}
 
 	return true, nil
 }
-
-var (
-	ErrDial             = errors.New("error while connecting to clamd")
-	ErrCommandCall      = errors.New("error while calling clamd")
-	ErrCommandRead      = errors.New("error while reading response from clamd")
-	ErrEmptySrc         = errors.New("scan source is empty")
-	ErrInvalidResponse  = errors.New("invalid response from clamd")
-	ErrNoSuchFileOrDir  = errors.New("clamd can't find file or directory")
-	ErrPermissionDenied = errors.New("clamd can't open file or dir, permission denied")
-	ErrUnknown          = errors.New("unknown error")
-)
