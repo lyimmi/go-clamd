@@ -17,7 +17,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install linux dependencies
-      run: sudo apt install clamav clamav-daemon -y && sudo service clamav-daemon start
+      run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
 
     - name: Set up Go
       uses: actions/setup-go@v3
