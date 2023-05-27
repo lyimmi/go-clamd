@@ -19,6 +19,12 @@ jobs:
     - name: Install linux dependencies
       run: sudo apt-get update -y && sudo apt-get install -y clamav clamav-daemon
       
+    - name: ClamAV set group
+      run: sudo sed -i 's/^\(LocalSocketGroup\s*\).*$/\1root/' /etc/clamav/clamd.conf
+      
+    - name: ClamAV set user
+      run: sudo sed -i 's/^\(User\s*\).*$/\1root/' /etc/clamav/clamd.conf
+      
     - name: Check ClamAV is-active
       run: systemctl is-active clamav-daemon.service
       shell: bash
