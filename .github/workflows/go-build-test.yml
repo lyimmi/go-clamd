@@ -30,7 +30,7 @@ jobs:
       run: sudo rm /var/log/clamav/freshclam.log
 
     - name: Start Clamd
-      run: sudo systemctl start clamav-daemon.service
+      run: sudo systemctl enable clamav-daemon.service
 
     - name: Clamd status
       run: sudo systemctl status clamav-daemon.service
