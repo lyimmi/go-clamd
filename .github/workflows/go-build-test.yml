@@ -18,11 +18,7 @@ jobs:
 
     - name: Install linux dependencies
       run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
-    
-    - name: Ping clamd.ctl
-      run: echo PING | nc -U /var/run/clamav/clamd.ctl
-      shell: bash
-      
+
     - name: Ping clamd.sock
       run: echo PING | nc -U /var/run/clamav/clamd.sock
       shell: bash
