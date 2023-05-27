@@ -333,6 +333,9 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 }
 
 func (c *Clamd) Stats(ctx context.Context) (*Stats, error) {
+	c.l()
+	defer c.ul()
+
 	res, err := c.writeCmdReadData(ctx, "STATS")
 	if err != nil {
 		return nil, err
