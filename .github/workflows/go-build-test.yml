@@ -20,7 +20,7 @@ jobs:
       run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
 
     - name: Ping clamd.sock
-      run: echo PING | nc -U /var/run/clamav/clamd.sock
+      run: cat /etc/clamav/clamd.conf | grep Local
       shell: bash
       
     - name: Set up Go
