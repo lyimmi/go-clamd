@@ -24,7 +24,7 @@ jobs:
       shell: bash
 
     - name: Start Clamd
-      run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
+      run: sudo service clamav-daemon start
       
     - name: Set up Go
       uses: actions/setup-go@v3
