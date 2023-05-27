@@ -118,18 +118,6 @@ func TestScanAll(t *testing.T) {
 	}
 }
 
-//func TestShutdown(t *testing.T) {
-//	clamd, teardown := setupTest(t)
-//	defer teardown(t)
-//	got, err := clamd.Shutdown(context.Background())
-//	if err != nil {
-//		t.Errorf("%v", err)
-//	}
-//	if !got {
-//		t.Errorf("clamd.Shutdown() = %v; want true", got)
-//	}
-//}
-
 func TestStats(t *testing.T) {
 	clamd := NewClamd()
 
@@ -139,5 +127,16 @@ func TestStats(t *testing.T) {
 	}
 	if got == nil {
 		t.Errorf("clamd.ScanAll() = %v; want Stats", got)
+	}
+}
+
+func TestShutdown(t *testing.T) {
+	clamd := NewClamd()
+	got, err := clamd.Shutdown(context.Background())
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if !got {
+		t.Errorf("clamd.Shutdown() = %v; want true", got)
 	}
 }
