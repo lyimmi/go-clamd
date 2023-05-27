@@ -2,7 +2,6 @@
 A Go client for ClamAV daemon over TCP or UNIX socket.
 
 ## Requirements
-- ClamAV and its daemon have to be installed on the host machine.
 - Minimum Go version 1.20 
 - Only targeted for Linux.
 
