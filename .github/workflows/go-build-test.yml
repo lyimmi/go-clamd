@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install linux dependencies
+      run: sudo apt-get update -y && sudo apt-get install -y clamav clamav-daemon
       
     - name: Set up Go
       uses: actions/setup-go@v3
@@ -23,3 +26,6 @@ jobs:
       
     - name: Build
       run: go build -v -o=example/example example/*.go
+      
+    - name: Test
+      run: go test -v ./...
