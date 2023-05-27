@@ -47,6 +47,16 @@ if ok, err := c.ScanAll(ctx, "/tmp"); !ok {
     }
     fmt.Printf("%s has maleware\n", fileName)
 }
+
+stats, err := c.Stats(ctx)
+if err != nil {
+    panic(err)
+}
+d, err := json.MarshalIndent(stats, "", "  ")
+if err != nil {
+    panic(err)
+}
+fmt.Println(string(d))
 ```
 
 ## License
