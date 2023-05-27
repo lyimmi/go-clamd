@@ -105,3 +105,14 @@ func TestScanAll(t *testing.T) {
 //		t.Errorf("clamd.Shutdown() = %v; want true", got)
 //	}
 //}
+
+func TestStats(t *testing.T) {
+	clamd := NewClamd()
+	got, err := clamd.Stats(context.Background())
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if got == nil {
+		t.Errorf("clamd.ScanAll() = %v; want Stats", got)
+	}
+}

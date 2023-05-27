@@ -315,3 +315,17 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 
 	return true, nil
 }
+
+func (c *Clamd) Stats(ctx context.Context) (*Stats, error) {
+	res, err := c.writeCmdReadData(ctx, "STATS")
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := parseStats(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
