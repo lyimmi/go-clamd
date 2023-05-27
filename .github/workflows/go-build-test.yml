@@ -17,7 +17,15 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install linux dependencies
-      run: sudo apt-get update -y && sudo apt-get install -y clamav clamav-daemon
+      run: sudo apt-get update -y && sudo apt-get install -y clamav clamscan clamav-daemon
+      
+    - name: Check ClamAV is-active
+      run: systemctl is-active clamav-daemon.service
+      shell: bash
+      
+    - name: Check ClamAV is-failed
+      run: systemctl is-failed clamav-daemon.service
+      shell: bash
       
     - name: Set up Go
       uses: actions/setup-go@v3
