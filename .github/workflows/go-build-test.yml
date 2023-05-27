@@ -28,7 +28,7 @@ jobs:
       run: go build -v -o=example/example example/*.go
   
     - name: Sleep for 30 seconds
-      run: sleep 15s
+      run: sleep 30s
       shell: bash
       
     - name: Test
