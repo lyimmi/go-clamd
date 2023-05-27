@@ -1,4 +1,6 @@
-# go-clamd
+# go-clamd 
+[![Go](https://github.com/Lyimmi/go-clamd/actions/workflows/go-build-test.yml/badge.svg)](https://github.com/Lyimmi/go-clamd/actions/workflows/go-build-test.yml)
+
 A Go client for ClamAV daemon over TCP or UNIX socket.
 
 ## Requirements
