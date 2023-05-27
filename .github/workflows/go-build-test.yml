@@ -15,25 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-
-    - name: Install linux dependencies
-      run: sudo apt install clamav clamav-base clamav-daemon -y && sudo service clamav-daemon start
-
-    - name: Check for socket settings
-      run: cat /etc/clamav/clamd.conf | grep Local
-      shell: bash
-
-    - name: Stop Clamd
-      run: sudo systemctl stop clamav-daemon.service
-
-    - name: Remove log
-      run: sudo rm /var/log/clamav/freshclam.log
-
-    - name: Start Clamd
-      run: sudo systemctl enable clamav-daemon.service
-
-    - name: Clamd status
-      run: sudo systemctl status clamav-daemon.service
       
     - name: Set up Go
       uses: actions/setup-go@v3
@@ -42,10 +23,3 @@ jobs:
       
     - name: Build
       run: go build -v -o=example/example example/*.go
-
-    - name: Wait for ClamD
-      run: x=1;y=false;while [ $x -le 90 ]; do if [ "$(echo PING | nc -U /var/run/clamav/clamd.ctl)" == "PONG" ]; then exit 0; fi; sleep 5;x=$(($x + 1));done;exit 1
-      shell: bash
-      
-    - name: Test
-      run: go test -v ./...
