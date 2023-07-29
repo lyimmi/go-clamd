@@ -29,7 +29,7 @@ go get github.com/lyimmi/go-clamd
 ```golang
 import (
     "fmt"
-    "github.com/Lyimmi/go-clamd"
+    "github.com/lyimmi/go-clamd"
 )
 
 c := clamd.NewClamd()
