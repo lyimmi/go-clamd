@@ -10,6 +10,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -36,6 +37,7 @@ const (
 	resReloading        = "RELOADING"
 	resNoSuchFile       = "No such file or directory. ERROR"
 	resPermissionDenied = "Permission denied. ERROR"
+	resCantOpenFile     = "Can't open file or directory ERROR"
 	resEICAR            = "Win.Test.EICAR_HDB-1 FOUND"
 )
 
@@ -229,6 +231,29 @@ func (c *Clamd) Shutdown(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
+func parseErr(res string, err error) (bool, error) {
+	if err != nil {
+		return false, err
+	}
+	if strings.HasSuffix(res, resOk) {
+		return true, nil
+	}
+	if strings.HasSuffix(res, resEICAR) {
+		return false, errors.Join(ErrEICARFound, fmt.Errorf("%s", res))
+	}
+	if strings.HasSuffix(res, resNoSuchFile) {
+		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
+	}
+	if strings.HasSuffix(res, resPermissionDenied) {
+		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
+	}
+	if strings.HasSuffix(res, resCantOpenFile) {
+		return false, errors.Join(ErrCantOpenFile, fmt.Errorf("%s", res))
+	}
+
+	return false, errors.Join(ErrUnknown, fmt.Errorf("%s", res))
+}
+
 // Scan a file or a directory (recursively) with archive support enabled (if not disabled in clamd.conf). A full path is required.
 func (c *Clamd) Scan(ctx context.Context, src string) (bool, error) {
 	c.l()
@@ -239,24 +264,8 @@ func (c *Clamd) Scan(ctx context.Context, src string) (bool, error) {
 	}
 
 	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", cmdScan, src))
-	if err != nil {
-		return false, err
-	}
 
-	if strings.HasSuffix(res, resOk) {
-		return true, nil
-	}
-	if strings.HasSuffix(res, resEICAR) {
-		return false, nil
-	}
-	if strings.HasSuffix(res, resNoSuchFile) {
-		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
-	}
-	if strings.HasSuffix(res, resPermissionDenied) {
-		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
-	}
-
-	return false, errors.Join(ErrUnknown, fmt.Errorf("%s", res))
+	return parseErr(res, err)
 }
 
 // ScanStream Scan a stream of data.This avoids the overhead of establishing new TCP connections and problems with NAT.
@@ -278,28 +287,34 @@ func (c *Clamd) ScanStream(ctx context.Context, r io.Reader) (bool, error) {
 		if n > 0 {
 			err = c.sendData(buf[0:n])
 			if err != nil {
+				if errors.Is(err, io.ErrClosedPipe) {
+					return false, errors.Join(ErrSreamLimitExceeded, err)
+				}
+				if errors.Is(err, net.ErrClosed) {
+					return false, errors.Join(ErrSreamLimitExceeded, err)
+				}
+				if errors.Is(err, syscall.EPIPE) {
+					return false, errors.Join(ErrSreamLimitExceeded, err)
+				}
 				return false, err
 			}
 		}
 		if err != nil {
-			break
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return false, err
 		}
 	}
 
 	_, err = c.conn.Write([]byte{0, 0, 0, 0})
 	if err != nil {
-		return false, err
+		return false, errors.Join(ErrUnknown, err)
 	}
 
 	res, err := c.readData()
-	if strings.HasSuffix(res, resOk) {
-		return true, nil
-	}
-	if strings.HasSuffix(res, resEICAR) {
-		return false, nil
-	}
 
-	return false, nil
+	return parseErr(res, err)
 }
 
 // ScanAll Scan file or directory (recursively) with archive support enabled and don't stop the scanning when a virus is found.
@@ -312,24 +327,8 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 	}
 
 	res, err := c.writeCmdReadData(ctx, fmt.Sprintf("%s %s", cmdContscan, src))
-	if err != nil {
-		return false, err
-	}
 
-	if strings.HasSuffix(res, resOk) {
-		return true, nil
-	}
-	if strings.HasSuffix(res, resEICAR) {
-		return false, nil
-	}
-	if strings.HasSuffix(res, resNoSuchFile) {
-		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
-	}
-	if strings.HasSuffix(res, resPermissionDenied) {
-		return false, errors.Join(ErrPermissionDenied, fmt.Errorf("%s", res))
-	}
-
-	return true, nil
+	return parseErr(res, err)
 }
 
 // Stats Replies with statistics about the scan queue, contents of scan queue, and memory usage.
