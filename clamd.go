@@ -332,6 +332,7 @@ func (c *Clamd) ScanAll(ctx context.Context, src string) (bool, error) {
 	return true, nil
 }
 
+// Stats Replies with statistics about the scan queue, contents of scan queue, and memory usage.
 func (c *Clamd) Stats(ctx context.Context) (*Stats, error) {
 	c.l()
 	defer c.ul()

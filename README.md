@@ -22,6 +22,10 @@ A Go client for ClamAV daemon over TCP or UNIX socket.
 
 ## Usage
 
+```shell
+go get github.com/lyimmi/go-clamd
+```
+
 ```golang
 import (
     "fmt"

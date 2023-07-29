@@ -2,7 +2,7 @@ package clamd
 
 import "errors"
 
-// Errors
+// Exported errors
 var (
 	ErrDial               = errors.New("error while connecting to clamd")
 	ErrCommandCall        = errors.New("error while calling clamd")
