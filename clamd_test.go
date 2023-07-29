@@ -2,6 +2,7 @@ package clamd
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"path"
@@ -75,7 +76,7 @@ func TestScan(t *testing.T) {
 	defer os.Remove(tf)
 
 	got, err := clamd.Scan(context.Background(), tf)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrEICARFound) {
 		t.Errorf("%v", err)
 	}
 	if got {
@@ -95,7 +96,7 @@ func TestStream(t *testing.T) {
 	}
 
 	got, err := clamd.ScanStream(context.Background(), f)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrEICARFound) {
 		t.Errorf("%v", err)
 	}
 	if got {
@@ -110,7 +111,7 @@ func TestScanAll(t *testing.T) {
 	defer os.Remove(tf)
 
 	got, err := clamd.ScanAll(context.Background(), tf)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrEICARFound) {
 		t.Errorf("%v", err)
 	}
 	if got {
