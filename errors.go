@@ -14,5 +14,4 @@ var (
 	ErrCantOpenFile       = errors.New("clamd can't open file or dir")
 	ErrSreamLimitExceeded = errors.New("clamd's INSTREAM size limit exceeded")
 	ErrUnknown            = errors.New("unknown error")
-	ErrEICARFound         = errors.New("Win.Test.EICAR_HDB-1 FOUND")
 )
