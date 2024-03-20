@@ -33,12 +33,12 @@ const (
 	cmdScan             = "SCAN"
 	cmdContscan         = "CONTSCAN"
 	resOk               = "OK"
+	resFound            = "FOUND"
 	resPong             = "PONG"
 	resReloading        = "RELOADING"
 	resNoSuchFile       = "No such file or directory. ERROR"
 	resPermissionDenied = "Permission denied. ERROR"
 	resCantOpenFile     = "Can't open file or directory ERROR"
-	resEICAR            = "Win.Test.EICAR_HDB-1 FOUND"
 )
 
 // NewClamd returns a Clamd client with default options.
@@ -238,8 +238,8 @@ func parseErr(res string, err error) (bool, error) {
 	if strings.HasSuffix(res, resOk) {
 		return true, nil
 	}
-	if strings.HasSuffix(res, resEICAR) {
-		return false, errors.Join(ErrEICARFound, fmt.Errorf("%s", res))
+	if strings.HasSuffix(res, resFound) {
+		return false, nil
 	}
 	if strings.HasSuffix(res, resNoSuchFile) {
 		return false, errors.Join(ErrNoSuchFileOrDir, fmt.Errorf("%s", res))
